@@ -19,6 +19,8 @@ double temp2;
 double pressurepulse = 0;
 double lastpressurepulse = -30000;
 
+double dwellstart = 0;
+double dwelltime = 60000; 
 
 MAX6675 thermocouple2(thermoCLK2, thermoCS2, thermoDO2);
 
@@ -90,6 +92,29 @@ void loop() {
     modeSet = 0;
    }
   
+  if(digitalRead(Init) == LOW && digitalRead(Inter) == LOW){
+    modeSet = 5;
+   }
+  
+  if(digitalRead(Inter) == LOW && digitalRead(Final) == LOW){
+    dwelltime = dwelltime + 60000; 
+    
+    if(dwelltime > 300000){
+       dwelltime = 0;
+     }
+    
+     lcd.setCursor(0,0);
+     lcd.print("Dwell ");
+     lcd.print(dwelltime/1000);
+     lcd.print("      ");
+     
+     delay(1000);
+     
+     if(dwelltime > 300000){
+       dwelltime = 0;
+     }
+    
+   }
   
   
   
@@ -99,11 +124,23 @@ void loop() {
   
   getTemp();
  
- if(temp2 >= TargetTemp && digitalRead(HeatRelay) == HIGH){
+ if(temp2 >= TargetTemp && digitalRead(HeatRelay) == HIGH && modeSet != 6){
    //set mode to cooling
-   modeSet = 4; 
-     
+   modeSet = 6; 
+   dwellstart = millis();
  }
+ 
+ 
+ // insert logic to do the dwell; will roll through quickly for dwell = 0
+ 
+ if(modeSet == 6 && millis() - dwellstart > dwelltime){
+   modeSet = 4; 
+   
+ }
+  
+ // end dwell section
+     
+ 
  
  if(modeSet == 4 && temp2 < TargetTemp){
    //when below 40C and in the right condition, turn off
@@ -220,8 +257,50 @@ void modeDisp(int mode){
     TargetTemp = 40;
   }
   
+   if(mode == 5){
+    lcd.setCursor(0,0);
+    lcd.print("Pressure Only   ");
+    //lcd.write(byte(0));
+    //lcd.print("C ");
+    
+    
+    digitalWrite(HeatRelay, LOW);
+    //digitalWrite(PressureRelay, HIGH);
+    PressureOn();
+    digitalWrite(InitMode, LOW);
+    digitalWrite(InterMode, LOW);
+    digitalWrite(FinalMode, LOW);
+    
+    TargetTemp = -10;
+  }
   
-  if(mode < 0 || mode > 4) {
+  
+  if(mode ==6){
+     lcd.setCursor(0,0);
+     lcd.print("Dwell ");
+     lcd.print((dwelltime - (millis() - dwellstart))/1000);
+     lcd.print("      ");
+    PressureOn();
+    
+    if(temp2 > TargetTemp){
+     
+      digitalWrite(HeatRelay, LOW);
+      // digitalWrite(InitMode, LOW);
+    //digitalWrite(InterMode, LOW);
+    //digitalWrite(FinalMode, LOW);
+    }
+    if(temp2 < TargetTemp){
+      
+      digitalWrite(HeatRelay, HIGH);
+      //digitalWrite(InitMode, LOW);
+      //digitalWrite(InterMode, HIGH);
+     //digitalWrite(FinalMode, LOW);
+    }
+          
+  }
+  
+  
+  if(mode < 0 || mode > 6) {
     mode = 0;
     }
   
